@@ -64,9 +64,9 @@ class Lingver private constructor(private val store: LocaleStore) {
      * <p>Note that you need to update all already fetched locale-based data manually.
      * [Lingver] is not responsible for that.
      */
-    fun setLocale(context: Context, locale: Locale) {
+    fun setLocale(context: Context, locale: Locale): Context {
         store.persistLocale(locale)
-        update(context, locale)
+        return update(context, locale)
     }
 
     /**
@@ -101,26 +101,27 @@ class Lingver private constructor(private val store: LocaleStore) {
         application.registerComponentCallbacks(LingverApplicationCallbacks(application, this))
     }
 
-    internal fun setLocaleInternal(context: Context) {
-        update(context, store.getLocale())
+    fun setLocaleInternal(context: Context): Context {
+        return update(context, store.getLocale())
     }
 
-    private fun update(context: Context, locale: Locale) {
-        updateResources(context, locale)
+    private fun update(context: Context, locale: Locale): Context {
+        val newContext = updateResources(context, locale)
         val appContext = context.applicationContext
         if (appContext !== context) {
             updateResources(appContext, locale)
         }
+        return newContext
     }
 
     @Suppress("DEPRECATION")
-    private fun updateResources(context: Context, locale: Locale) {
+    private fun updateResources(context: Context, locale: Locale): Context {
         Locale.setDefault(locale)
 
         val res = context.resources
         val current = res.configuration.getLocaleCompat()
 
-        if (current == locale) return
+        if (current == locale) return context
 
         val config = Configuration(res.configuration)
         when {
@@ -128,7 +129,15 @@ class Lingver private constructor(private val store: LocaleStore) {
             isAtLeastSdkVersion(VERSION_CODES.JELLY_BEAN_MR1) -> config.setLocale(locale)
             else -> config.locale = locale
         }
+
+        val newContext = if (isAtLeastSdkVersion(VERSION_CODES.JELLY_BEAN_MR1)) {
+            context.createConfigurationContext(config);
+        } else {
+            context
+        }
+
         res.updateConfiguration(config, res.displayMetrics)
+        return newContext
     }
 
     @SuppressLint("NewApi")
